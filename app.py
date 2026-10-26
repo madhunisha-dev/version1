@@ -1,5 +1,5 @@
 
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, redirect, url_for
 import json
 import os
 
@@ -10,7 +10,7 @@ PAGE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Asset Management System - V2</title>
+    <title>Asset Management System - V3</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {
@@ -20,7 +20,7 @@ PAGE = """
             padding: 40px 20px;
         }
         .container {
-            max-width: 850px;
+            max-width: 950px;
             margin: auto;
             background: white;
             padding: 30px;
@@ -29,10 +29,10 @@ PAGE = """
         h1 { color: #1e3a8a; }
         input, button {
             box-sizing: border-box;
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0;
+            padding: 10px;
+            margin: 5px 0;
         }
+        input { width: 100%; }
         button {
             background: #1d4ed8;
             color: white;
@@ -40,6 +40,7 @@ PAGE = """
             border-radius: 6px;
             cursor: pointer;
         }
+        .delete-button { background: #dc2626; }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -58,7 +59,7 @@ PAGE = """
 <body>
     <div class="container">
         <h1>Asset Management System</h1>
-        <p>Version 2 - Add and View Assets</p>
+        <p>Version 3 - Add, View and Delete Assets</p>
 
         <h2>Add Asset</h2>
         <form method="POST" action="/add">
@@ -78,6 +79,7 @@ PAGE = """
                     <th>Name</th>
                     <th>Type</th>
                     <th>Location</th>
+                    <th>Action</th>
                 </tr>
                 {% for asset in assets %}
                 <tr>
@@ -85,10 +87,18 @@ PAGE = """
                     <td>{{ asset.name }}</td>
                     <td>{{ asset.type }}</td>
                     <td>{{ asset.location }}</td>
+                    <td>
+                        <form method="POST" action="/delete/{{ asset.id }}"
+                              onsubmit="return confirm('Delete this asset?');">
+                            <button type="submit" class="delete-button">
+                                Delete
+                            </button>
+                        </form>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4">No assets added yet.</td>
+                    <td colspan="5">No assets added yet.</td>
                 </tr>
                 {% endfor %}
             </table>
@@ -103,6 +113,10 @@ def load_assets():
         return []
     with open(DATA_FILE, "r") as file:
         return json.load(file)
+
+def save_assets(assets):
+    with open(DATA_FILE, "w") as file:
+        json.dump(assets, file, indent=4)
 
 @app.route("/")
 def home():
@@ -124,11 +138,22 @@ def add_asset():
         )
 
     assets.append(asset)
-    with open(DATA_FILE, "w") as file:
-        json.dump(assets, file, indent=4)
+    save_assets(assets)
+    return redirect(url_for("home"))
+
+@app.route("/delete/<int:asset_id>", methods=["POST"])
+def delete_asset(asset_id):
+    assets = load_assets()
+    updated_assets = [a for a in assets if a["id"] != asset_id]
+
+    if len(updated_assets) == len(assets):
+        message = "Asset not found."
+    else:
+        save_assets(updated_assets)
+        message = "Asset deleted successfully!"
 
     return render_template_string(
-        PAGE, assets=assets, message="Asset added successfully!"
+        PAGE, assets=load_assets(), message=message
     )
 
 if __name__ == "__main__":
